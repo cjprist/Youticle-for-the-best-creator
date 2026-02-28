@@ -65,7 +65,9 @@ class ScenePlannerService:
             return json.loads(block.group(1))
         raise ValueError("Scene planner JSON parse failed.")
 
-    def _build_prompt(self, payload: AssetJobCreateRequest) -> str:
+    def _build_prompt(
+        self, payload: AssetJobCreateRequest, creator_reference: dict[str, Any] | None = None
+    ) -> str:
         body_lines = [{"t": b.t, "line": b.line} for b in payload.script.body_15_150s]
         planner_input = {
             "meta": {
@@ -86,6 +88,7 @@ class ScenePlannerService:
             },
             "assets": {"on_screen_bullets": payload.assets.on_screen_bullets},
             "scene_sources": self._scene_sources(payload),
+            "creator_reference": creator_reference or {},
         }
         return (
             "너는 영상 스토리보드 씬 플래너다. 반드시 한국어로 응답한다.\n"
@@ -96,13 +99,15 @@ class ScenePlannerService:
             "2) source_span은 순서대로 hook, body_0, body_1, body_2_or_conclusion, closing+conclusion.\n"
             "3) 모든 장면은 동일 인물 1명을 유지할 수 있도록 character_bible을 구체화.\n"
             "4) 프레임은 상황 재연 중심(주체/행동/배경/소품/카메라)으로 작성.\n"
-            "5) left_props는 텍스트 없는 사물 상징 2~3개.\n"
-            "6) 텍스트 렌더링 금지(썸네일도 문자 금지, 불가피 시 숫자 1/2/3만).\n"
+            "5) left_props는 실사형 사물 상징 2~3개.\n"
+            "6) 캐릭터는 실사풍으로 설계하고, 대본 주제와 관련된 유튜버 인상/분위기를 반영.\n"
+            "7) 텍스트는 소량 허용: 장면당 한국어 1~3단어, 최대 12자 수준. 영문 장문 금지.\n"
             "JSON 스키마:\n"
             "{\n"
             '  "character_bible": {\n'
             '    "identity": "...", "age_range": "...", "face_shape": "...", "hair_style": "...",\n'
             '    "outfit": "...", "outfit_colors": ["..."], "expression_range": "...",\n'
+            '    "reference_creator_style": "...",\n'
             '    "forbidden_changes": ["..."]\n'
             "  },\n"
             '  "consistency_rules": ["..."],\n'
@@ -166,8 +171,10 @@ class ScenePlannerService:
             scenes=scenes,
         )
 
-    def plan(self, payload: AssetJobCreateRequest) -> ScenePlanResult:
-        prompt = self._build_prompt(payload)
+    def plan(
+        self, payload: AssetJobCreateRequest, creator_reference: dict[str, Any] | None = None
+    ) -> ScenePlanResult:
+        prompt = self._build_prompt(payload, creator_reference=creator_reference)
         last_error: Exception | None = None
         for attempt in range(self.settings.max_scene_plan_attempts):
             temperature = 0.2 if attempt > 0 else 0.5

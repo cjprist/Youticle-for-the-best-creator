@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.schemas import AssetJobCreateRequest
 from app.services.scene_planner import PlannedScene, ScenePlanResult
 
-PROMPT_VERSION = "storyboard_dynamic_scene_v1_ko"
+PROMPT_VERSION = "storyboard_dynamic_scene_v1_ko_realistic_v2"
 FRAME_COUNT = 5
 
 
@@ -11,9 +11,10 @@ def build_style_bible_block() -> str:
     return (
         "[시리즈 스타일 바이블]\n"
         "5장 이미지가 동일한 아트 디렉션을 유지한다.\n"
-        "미니멀 에디토리얼 일러스트, 벡터 느낌의 선명한 형태, 부드러운 그라디언트, 높은 대비, 넓은 여백.\n"
+        "실사 기반 시네마틱 스타일, 인물 피부/의복/배경 질감이 사진처럼 자연스럽게 보이도록 구성.\n"
+        "배경 그래픽도 평면 일러스트가 아니라 실사형 3D 오브젝트/실제 공간 조명처럼 표현.\n"
         "현대 뉴스룸/다큐 톤, 차분하지만 진지하고 긴장감 있는 분위기.\n"
-        "16:9 (1920x1080), 우측 메인 주체 + 좌측 보조 상징 구성 고정.\n"
+        "16:9 (640x360), 우측 메인 주체 + 좌측 보조 상징 구성 고정.\n"
         "딥 네이비 + 쿨 그레이 + 뮤트 틸 + 소량의 웜 앰버.\n"
         "은은한 림라이트, 부드러운 그림자, 또렷한 엣지.\n"
         "금지: 국기/국장/군표식/실제지도/랜드마크/로고/워터마크."
@@ -31,6 +32,12 @@ def _character_block(character_bible: dict[str, object]) -> str:
     forbidden_changes = ", ".join(
         [str(x) for x in character_bible.get("forbidden_changes", [])]
     ) or "헤어/의상/얼굴형/연령대 변경 금지"
+    reference_creator_style = str(
+        character_bible.get(
+            "reference_creator_style",
+            "대본 주제와 관련된 유튜버의 분위기/인상/실루엣을 참고하되 동일 복제는 피함",
+        )
+    )
     return (
         "[캐릭터 바이블]\n"
         f"정체성: {identity}\n"
@@ -40,8 +47,10 @@ def _character_block(character_bible: dict[str, object]) -> str:
         f"의상: {outfit}\n"
         f"의상색: {outfit_colors}\n"
         f"표정범위: {expression_range}\n"
+        f"참조 유튜버 스타일: {reference_creator_style}\n"
         f"변경금지: {forbidden_changes}\n"
-        "규칙: 모든 프레임에서 동일 인물 외형을 절대 변경하지 않는다."
+        "규칙: 모든 프레임에서 동일 인물 외형을 절대 변경하지 않는다.\n"
+        "규칙: 관련 유튜버와 유사한 분위기/체형/스타일을 유지하되 초상은 과도하게 복제하지 않는다."
     )
 
 
@@ -52,7 +61,8 @@ def build_character_anchor_prompt(scene_plan: ScenePlanResult) -> str:
         f"{_character_block(scene_plan.character_bible)}\n"
         "구도: 인물은 우측 중앙, 좌측에는 텍스트 없는 추상 상징 2개.\n"
         "카메라: 미디엄 클로즈업, 아이레벨.\n"
-        "금지규칙: 문자/숫자/자막/타이포 렌더링 금지.\n"
+        "텍스트규칙: 필요한 경우에만 1~3단어의 짧은 한국어 라벨을 아주 작게 허용.\n"
+        "텍스트규칙: 긴 문장/영문 문장/큰 타이포 렌더링 금지.\n"
         f"{build_style_bible_block()}"
     )
 
@@ -76,7 +86,8 @@ def build_grounded_scene_prompt(
         f"{_character_block(scene_plan.character_bible)}\n"
         f"[일관성 규칙] {consistency_rules}\n"
         "프레임 생성 규칙: 설명문이 아니라 실제 상황을 한 컷으로 재연한다.\n"
-        "금지규칙: 문자/숫자/영문/한글/자막/타이포 렌더링 금지.\n"
+        "텍스트규칙: 설명을 위해 아주 짧은 한국어 텍스트(최대 1~3단어, 한 장면 최대 12자 내)를 소량 허용.\n"
+        "텍스트규칙: 영문 문장/긴 문장/큰 자막/과도한 타이포는 금지.\n"
         "금지규칙: 국기/국장/군표식/실지도/랜드마크/브랜드 로고/워터마크 금지.\n"
         "이탈금지: 장면목표 외 사건/인물/사물 추가 금지.\n"
         f"{build_style_bible_block()}"
@@ -89,7 +100,7 @@ def build_retry_prompt(base_prompt: str, retry_idx: int) -> str:
     if retry_idx == 1:
         return (
             f"{base_prompt}\n"
-            "재시도규칙1: 장면 핵심행동만 더 명확히, 텍스트 표식은 절대 생성하지 않는다."
+            "재시도규칙1: 장면 핵심행동과 인물 유사도를 더 명확히, 텍스트는 1~3단어 한국어 라벨만 최소 허용."
         )
     return (
         f"{base_prompt}\n"
@@ -121,7 +132,8 @@ def build_thumbnail_prompt(payload: AssetJobCreateRequest, scene_plan: ScenePlan
         f"카메라: 샷={plan.get('camera_shot', '클로즈업')}, 앵글={plan.get('camera_angle', '아이레벨')}\n"
         f"{_character_block(scene_plan.character_bible)}\n"
         "목표: CTR 중심의 고대비/강한 시선 유도/긴장감.\n"
-        "금지규칙: 문자 금지, 불가피할 때 숫자 1/2/3만 허용.\n"
+        "텍스트규칙: 설명용 짧은 한국어 텍스트 1줄(최대 3단어, 최대 12자)만 허용.\n"
+        "텍스트규칙: 영문/긴 문장/과도한 텍스트 노출 금지.\n"
         "금지규칙: 로고/워터마크/국기/국장/군표식/실지도/랜드마크 금지.\n"
         f"{build_style_bible_block()}"
     )

@@ -33,7 +33,7 @@ services:
     env_file:
       - .env
     environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /secrets/generation-sa.json
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/strategy-sa.json
       GCP_PROJECT_ID: ${GENERATION_GCP_PROJECT_ID}
       GCP_LOCATION: ${GENERATION_GCP_LOCATION}
       GENERATION_VERTEX_API_KEY: ${GENERATION_VERTEX_API_KEY}
@@ -43,7 +43,7 @@ services:
       - "8001:8001"
     volumes:
       - ./backend-generation:/app
-      - ./.secrets/generation-sa.json:/secrets/generation-sa.json:ro
+      - ./.secrets/strategy-sa.json:/secrets/strategy-sa.json:ro
       - ./frontend/public/generated:/workspace/frontend/public/generated
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
     restart: unless-stopped
