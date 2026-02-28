@@ -56,7 +56,7 @@ export default function ChannelHandleForm({ onSubmit, isSubmitting }) {
     setError("");
     await onSubmit({
       channelHandle: normalizedHandle,
-      maxVideos: 1,
+      maxVideos: 2,
     });
   }
 
@@ -78,11 +78,11 @@ export default function ChannelHandleForm({ onSubmit, isSubmitting }) {
           aria-invalid={Boolean(error)}
         />
         <button type="submit" className="primary-btn" disabled={!hasValidHandle || isSubmitting}>
-          {isSubmitting ? "수집 중..." : "최신 1개 분석"}
+          {isSubmitting ? "수집 중..." : "최신 영상 2개 분석"}
         </button>
       </div>
       <p className="form-help">
-        입력이 URL이어도 자동으로 핸들 형식으로 변환됩니다.
+        입력이 URL이어도 자동으로 핸들 형식으로 변환되며, 최신 영상 2개를 분석합니다.
       </p>
       <p className="form-preview">인식된 핸들: {hasValidHandle ? normalizedHandle : "-"}</p>
       {error ? <p className="form-error">{error}</p> : null}

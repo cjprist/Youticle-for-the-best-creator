@@ -8,6 +8,7 @@ from app.schemas import (
     BodyLine,
     ChartItem,
     CtaBlock,
+    EvidenceItem,
     ExcludedItem,
     JobOptions,
     LogicBlock,
@@ -24,6 +25,17 @@ def _as_str(value: Any, default: str = "") -> str:
     return text if text else default
 
 
+def _as_int(value: Any, default: int) -> int:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _normalize_time_window(item: dict[str, Any]) -> str:
     t_value = _as_str(item.get("t"))
     if t_value:
@@ -33,6 +45,21 @@ def _normalize_time_window(item: dict[str, Any]) -> str:
     if start is None and end is None:
         return ""
     return f"{start}-{end}s"
+
+
+def _to_text_list(raw: Any) -> list[str]:
+    if isinstance(raw, list):
+        return [_as_str(item) for item in raw if _as_str(item)]
+
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        if "\n" in text:
+            return [line.strip() for line in text.splitlines() if line.strip()]
+        return [text]
+
+    return []
 
 
 def _normalize_body_lines(raw_script: dict[str, Any]) -> list[BodyLine]:
@@ -94,6 +121,49 @@ def _normalize_chart_items(raw_assets: dict[str, Any]) -> list[ChartItem]:
     return []
 
 
+def _normalize_evidence_summary(raw: Any) -> list[EvidenceItem]:
+    if not isinstance(raw, list):
+        return []
+
+    out: list[EvidenceItem] = []
+    for item in raw:
+        if isinstance(item, str):
+            quote = _as_str(item)
+            if quote:
+                out.append(EvidenceItem(quote=quote))
+            continue
+
+        if not isinstance(item, dict):
+            continue
+
+        quote = _as_str(item.get("quote"))
+        if not quote:
+            quote = _as_str(item.get("text")) or _as_str(item.get("comment")) or _as_str(item.get("line"))
+        if not quote:
+            continue
+
+        like_count_raw = item.get("like_count")
+        like_count = _as_int(like_count_raw, -1)
+        out.append(
+            EvidenceItem(
+                quote=quote,
+                like_count=like_count if like_count >= 0 else None,
+                video_id=_as_str(item.get("video_id")) or None,
+            )
+        )
+    return out
+
+
+def _normalize_cta(raw: Any) -> CtaBlock:
+    if isinstance(raw, dict):
+        return CtaBlock.model_validate(raw or {})
+
+    line = _as_str(raw)
+    if not line:
+        return CtaBlock()
+    return CtaBlock(line=line)
+
+
 def normalize_asset_job_payload(raw: dict[str, Any]) -> AssetJobCreateRequest:
     if not isinstance(raw, dict):
         raise ValueError("Payload must be a JSON object.")
@@ -108,7 +178,7 @@ def normalize_asset_job_payload(raw: dict[str, Any]) -> AssetJobCreateRequest:
 
     meta = MetaData(
         source_signal_id=_as_str(raw_meta.get("source_signal_id"), "unknown_signal"),
-        target_length_sec=int(raw_meta.get("target_length_sec", 180)),
+        target_length_sec=_as_int(raw_meta.get("target_length_sec"), 180),
         language=_as_str(raw_meta.get("language"), "ko"),
         style=_as_str(raw_meta.get("style"), "informative"),
         title=_as_str(raw_meta.get("title")),
@@ -119,20 +189,20 @@ def normalize_asset_job_payload(raw: dict[str, Any]) -> AssetJobCreateRequest:
     if "logic" in raw_rationale and isinstance(raw_rationale.get("logic"), dict):
         raw_logic = raw_rationale["logic"]
         logic = LogicBlock(
-            observations=raw_logic.get("observations", []) or [],
-            inference=raw_logic.get("inference", []) or [],
+            observations=_to_text_list(raw_logic.get("observations")),
+            inference=_to_text_list(raw_logic.get("inference")),
             conclusion=_as_str(raw_logic.get("conclusion")),
         )
     else:
         logic = LogicBlock(
-            observations=raw_rationale.get("observations", []) or [],
-            inference=raw_rationale.get("inference", []) or [],
+            observations=_to_text_list(raw_rationale.get("observations")),
+            inference=_to_text_list(raw_rationale.get("inference")),
             conclusion=_as_str(raw_rationale.get("conclusion")),
         )
 
     rationale = RationaleBlock(
         title=_as_str(raw_rationale.get("title")),
-        evidence_summary=raw_rationale.get("evidence_summary", []) or [],
+        evidence_summary=_normalize_evidence_summary(raw_rationale.get("evidence_summary")),
         logic=logic,
         what_we_excluded=_normalize_what_we_excluded(raw_rationale.get("what_we_excluded")),
     )
@@ -148,7 +218,7 @@ def normalize_asset_job_payload(raw: dict[str, Any]) -> AssetJobCreateRequest:
         hook_0_15s=_as_str(raw_script.get("hook_0_15s"), logic.conclusion),
         body_15_150s=body_lines,
         closing_150_180s=_as_str(raw_script.get("closing_150_180s"), logic.conclusion),
-        cta=CtaBlock.model_validate(raw_script.get("cta", {}) or {}),
+        cta=_normalize_cta(raw_script.get("cta", {})),
     )
 
     bullets = raw_assets.get("on_screen_bullets", [])
