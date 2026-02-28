@@ -455,6 +455,32 @@ p {
   gap: 12px;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.generated-thumb {
+  width: min(560px, 100%);
+  border-radius: 10px;
+  border: 1px solid #d5def5;
+  object-fit: cover;
+}
+
+.generated-frames {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.generated-frame {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #d5def5;
+}
+
 .action-title {
   font-size: 0.9rem;
   font-weight: 600;
@@ -500,6 +526,10 @@ p {
     position: static;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .action-buttons {
+    width: 100%;
   }
 
   .video-evidence-item {
