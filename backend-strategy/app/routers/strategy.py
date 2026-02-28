@@ -257,11 +257,12 @@ def build_pipeline_from_handle(payload: ChannelPipelineRequest) -> ChannelPipeli
     request_id = str(uuid.uuid4())[:8]
     started_at = time.perf_counter()
     logger.info(
-        "[%s] pipeline:start handle=%s max_videos=%s max_comments_per_video=%s language=%s style=%s target_length=%s",
+        "[%s] pipeline:start handle=%s max_videos=%s max_comments_per_video=%s comment_order=%s language=%s style=%s target_length=%s",
         request_id,
         payload.channel_handle,
         payload.max_videos,
         payload.max_comments_per_video,
+        payload.comment_order,
         payload.language,
         payload.style,
         payload.target_length_sec,
@@ -275,6 +276,7 @@ def build_pipeline_from_handle(payload: ChannelPipelineRequest) -> ChannelPipeli
             channel_handle=payload.channel_handle,
             max_videos=payload.max_videos,
             max_comments_per_video=payload.max_comments_per_video,
+            comment_order=payload.comment_order,
         )
         logger.info(
             "[%s] pipeline:comments_collected videos=%s elapsed=%.2fs",
@@ -389,11 +391,12 @@ def collect_youtube_comments(payload: YouTubeCommentsRequest) -> YouTubeComments
     request_id = str(uuid.uuid4())[:8]
     started_at = time.perf_counter()
     logger.info(
-        "[%s] youtube/comments:start handle=%s max_videos=%s max_comments_per_video=%s",
+        "[%s] youtube/comments:start handle=%s max_videos=%s max_comments_per_video=%s comment_order=%s",
         request_id,
         payload.channel_handle,
         payload.max_videos,
         payload.max_comments_per_video,
+        payload.comment_order,
     )
     try:
         service = YouTubeCommentService()
@@ -401,6 +404,7 @@ def collect_youtube_comments(payload: YouTubeCommentsRequest) -> YouTubeComments
             channel_handle=payload.channel_handle,
             max_videos=payload.max_videos,
             max_comments_per_video=payload.max_comments_per_video,
+            comment_order=payload.comment_order,
         )
         logger.info(
             "[%s] youtube/comments:done videos=%s elapsed=%.2fs",

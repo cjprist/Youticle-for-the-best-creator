@@ -37,6 +37,12 @@ Hard constraints:
    - Politics: no agitation/partisan persuasion; use conditions/costs/scenarios framing.
 6) Dedupe:
    - Merge semantically similar comments/signals; avoid near-duplicate signals.
+7) Perspective lock (important):
+   - Write signals for the input channel owner/operator perspective.
+   - core_question, demand, content_plan, actionables must be directly executable by "our channel".
+   - Prefer wording like "우리 채널", "다음 영상에서 우리가".
+   - Do NOT output third-person consulting tone about another creator/brand/government as primary actor.
+   - Avoid recommendations that require external institutions as the main executor.
 
 Scoring guidance (internal):
 - evidence_strength: 0~1 (like_count strength + clarity + representativeness)
@@ -89,6 +95,12 @@ Hard constraints:
    - Target 180 seconds spoken Korean.
    - Keep sentences short and speakable.
    - body_15_150s must have exactly 4 timed blocks.
+6) Perspective lock (important):
+   - Write from the channel owner's point of view (first-person creator voice).
+   - Treat the input signal as "our channel audience demand", not as another creator's case.
+   - Prefer wording like "우리 채널", "이번 영상에서 우리가", "우리 시청자".
+   - Do NOT frame the script as third-person commentary about other creators.
+   - CTA must ask what this channel should do next, for this channel's next video.
 
 Structure rules:
 - hook_0_15s: problem framing + promise
@@ -105,6 +117,7 @@ Structure rules:
 Style:
 - informative, creator-friendly, high clarity, low jargon.
 - Avoid exaggeration and absolute claims.
+- owner-operator execution tone: concrete and actionable for immediate next upload.
 
 Validation rules (must pass before final output):
 - Valid JSON parse.

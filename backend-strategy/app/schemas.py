@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -54,6 +55,10 @@ class YouTubeCommentsRequest(BaseModel):
         ge=1,
         le=100,
         description="Number of comments to collect per video",
+    )
+    comment_order: Literal["top", "latest"] = Field(
+        default="top",
+        description="Comment ordering mode: top (like/relevance-first) or latest (time-first)",
     )
 
 
@@ -154,6 +159,10 @@ class ChannelPipelineRequest(BaseModel):
         ge=1,
         le=100,
         description="Number of comments to collect per video",
+    )
+    comment_order: Literal["top", "latest"] = Field(
+        default="top",
+        description="Comment ordering mode: top (like/relevance-first) or latest (time-first)",
     )
     language: str = "ko"
     target_length_sec: int = 180

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal
 from typing import Any
 
 import httpx
@@ -28,6 +29,7 @@ class YouTubeCommentService:
         channel_handle: str,
         max_videos: int = 10,
         max_comments_per_video: int = 10,
+        comment_order: Literal["top", "latest"] = "top",
     ) -> dict[str, Any]:
         handle = channel_handle.strip()
         if not handle:
@@ -42,7 +44,9 @@ class YouTubeCommentService:
         video_payloads: list[dict[str, Any]] = []
         for video in videos:
             comments = self._fetch_comments_for_video(
-                video["id"], max_comments_per_video=max_comments_per_video
+                video["id"],
+                max_comments_per_video=max_comments_per_video,
+                comment_order=comment_order,
             )
             video_payloads.append(
                 {
@@ -125,14 +129,19 @@ class YouTubeCommentService:
         return videos
 
     def _fetch_comments_for_video(
-        self, video_id: str, *, max_comments_per_video: int = 10
+        self,
+        video_id: str,
+        *,
+        max_comments_per_video: int = 10,
+        comment_order: Literal["top", "latest"] = "top",
     ) -> list[dict[str, Any]]:
+        youtube_order = "relevance" if comment_order == "top" else "time"
         params = {
             "part": "snippet",
             "videoId": video_id,
             "textFormat": "plainText",
             "maxResults": min(max_comments_per_video, 100),
-            "order": "time",
+            "order": youtube_order,
         }
         comments: list[dict[str, Any]] = []
         data = self._get("commentThreads", params)
@@ -143,6 +152,10 @@ class YouTubeCommentService:
                 comments.append(comment_payload)
             if len(comments) >= max_comments_per_video:
                 break
+
+        # Keep top mode deterministic by explicitly prioritizing higher like_count.
+        if comment_order == "top":
+            comments.sort(key=lambda c: int(c.get("like_count", 0)), reverse=True)
         return comments[:max_comments_per_video]
 
     def _build_comment_payload(

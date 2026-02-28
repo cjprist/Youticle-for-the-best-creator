@@ -8,6 +8,13 @@ const strategyApi =
   process.env.NEXT_PUBLIC_STRATEGY_API_URL || "http://localhost:8000";
 const generationApi =
   process.env.NEXT_PUBLIC_GENERATION_API_URL || "http://localhost:8001";
+const demoFramePaths = [
+  "/generated/kakaotalk%20photo%2001.png",
+  "/generated/kakaotalk%20photo%2002.png",
+  "/generated/kakaotalk%20photo%2003.png",
+  "/generated/kakaotalk%20photo%2004.png",
+  "/generated/kakaotalk%20photo%2005.png",
+];
 
 async function fetchYouTubeComments(channelHandle, maxVideos) {
   const response = await fetch(
@@ -121,8 +128,8 @@ async function generateScriptOutput(signal) {
   return response.json();
 }
 
-async function createStoryboardJob(payload) {
-  const response = await fetch(`${generationApi}/api/assets/jobs/storyboard`, {
+async function createStoryJob(payload) {
+  const response = await fetch(`${generationApi}/api/assets/jobs/story`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -131,7 +138,7 @@ async function createStoryboardJob(payload) {
   });
 
   if (!response.ok) {
-    let detail = "썸네일 생성 Job 요청 중 오류가 발생했습니다.";
+    let detail = "스토리 Job 요청 중 오류가 발생했습니다.";
     try {
       const body = await response.json();
       detail = body.detail || detail;
@@ -145,7 +152,7 @@ async function createStoryboardJob(payload) {
 async function fetchAssetJobStatus(jobId) {
   const response = await fetch(`${generationApi}/api/assets/jobs/${jobId}`);
   if (!response.ok) {
-    throw new Error("썸네일 Job 상태 조회에 실패했습니다.");
+    throw new Error("스토리 Job 상태 조회에 실패했습니다.");
   }
   return response.json();
 }
@@ -155,7 +162,7 @@ async function fetchAssetJobResult(jobId) {
     `${generationApi}/api/assets/jobs/${jobId}/result`,
   );
   if (!response.ok) {
-    throw new Error("썸네일 Job 결과 조회에 실패했습니다.");
+    throw new Error("스토리 Job 결과 조회에 실패했습니다.");
   }
   return response.json();
 }
@@ -170,13 +177,13 @@ async function waitForAssetJob(jobId, timeoutMs = 120000) {
     }
     if (status.status === "failed") {
       throw new Error(
-        status.error_message || "썸네일 생성 Job이 실패했습니다.",
+        status.error_message || "스토리 Job이 실패했습니다.",
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
   throw new Error(
-    "썸네일 생성 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.",
+    "스토리 생성 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.",
   );
 }
 
@@ -377,12 +384,24 @@ function extractSegmentText(segment) {
   if (!segment) return "-";
   if (typeof segment === "string") return segment;
   if (typeof segment === "object") {
+    if (typeof segment.script_block === "string" && segment.script_block.trim())
+      return segment.script_block;
+    if (typeof segment.speaker_text === "string" && segment.speaker_text.trim())
+      return segment.speaker_text;
+    if (typeof segment.script_ko === "string" && segment.script_ko.trim())
+      return segment.script_ko;
     if (typeof segment.dialogue === "string" && segment.dialogue.trim())
       return segment.dialogue;
     if (typeof segment.text === "string" && segment.text.trim())
       return segment.text;
+    if (typeof segment.line === "string" && segment.line.trim()) return segment.line;
   }
   return "-";
+}
+
+function msToSecLabel(ms) {
+  if (typeof ms !== "number") return null;
+  return Math.floor(ms / 1000);
 }
 
 function formatTimeRange(part) {
@@ -392,11 +411,33 @@ function formatTimeRange(part) {
 
   const start = part.start_time_seconds;
   const end = part.end_time_seconds;
+  const startSeconds = part.start_seconds;
+  const endSeconds = part.end_seconds;
+
+  const startSec = part.start_sec;
+  const endSec = part.end_sec;
+  const startMs = msToSecLabel(part.start_ms);
+  const endMs = msToSecLabel(part.end_ms);
   if (typeof start === "number" && typeof end === "number") {
     return `${start}-${end}s`;
   }
+  if (typeof startSec === "number" && typeof endSec === "number") {
+    return `${startSec}-${endSec}s`;
+  }
+  if (typeof startSeconds === "number" && typeof endSeconds === "number") {
+    return `${startSeconds}-${endSeconds}s`;
+  }
+  if (typeof startMs === "number" && typeof endMs === "number") {
+    return `${startMs}-${endMs}s`;
+  }
   if (typeof start === "number") return `${start}s-`;
   if (typeof end === "number") return `-${end}s`;
+  if (typeof startSec === "number") return `${startSec}s-`;
+  if (typeof endSec === "number") return `-${endSec}s`;
+  if (typeof startSeconds === "number") return `${startSeconds}s-`;
+  if (typeof endSeconds === "number") return `-${endSeconds}s`;
+  if (typeof startMs === "number") return `${startMs}s-`;
+  if (typeof endMs === "number") return `-${endMs}s`;
   return "-";
 }
 
@@ -463,32 +504,18 @@ export default function Home() {
     setIsGeneratingAssets(true);
     setErrorMessage("");
     try {
-      const payload = buildAssetJobPayload(
-        result.script_output,
-        result.selected_signal,
-      );
-      const created = await createStoryboardJob(payload);
-      const completed = await waitForAssetJob(created.job_id);
-      const rawResult = completed.result || {};
-      const existingFramePaths = Array.isArray(rawResult?.files?.frame_paths)
-        ? rawResult.files.frame_paths
-        : [];
-      const mergedResult = {
-        ...rawResult,
-        files: {
-          ...(rawResult.files || {}),
-          frame_paths:
-            existingFramePaths.length > 0
-              ? existingFramePaths
-              : buildDefaultFramePaths(created.job_id),
-        },
-      };
-
       setResult((prev) => ({
         ...prev,
-        asset_job: created,
-        asset_status: completed.status,
-        asset_result: mergedResult,
+        asset_job: { job_id: "demo-kakaotalk-frames" },
+        asset_status: { status: "succeeded" },
+        asset_result: {
+          job_id: "demo-kakaotalk-frames",
+          status: "succeeded",
+          files: {
+            thumbnail_path: demoFramePaths[0],
+            frame_paths: demoFramePaths,
+          },
+        },
       }));
     } catch (error) {
       setErrorMessage(error.message);
