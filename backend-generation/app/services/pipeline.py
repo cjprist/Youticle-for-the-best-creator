@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import json
-import math
 import re
-import struct
 import time
-import wave
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Literal
 
-from moviepy import AudioFileClip, CompositeAudioClip, ImageClip, concatenate_videoclips
+from moviepy import ImageClip, concatenate_videoclips
 
 from app.config import get_settings
 from app.schemas import (
@@ -20,6 +17,7 @@ from app.schemas import (
     JobResultResponse,
 )
 from app.services.job_store import JobRecord, JobStore
+from app.services.creator_reference import CreatorReferenceService
 from app.services.prompt_builder import (
     FRAME_COUNT,
     PROMPT_VERSION,
@@ -29,7 +27,6 @@ from app.services.prompt_builder import (
     build_storyboard_prompts,
     build_storyboard_summary_for_veo,
     build_thumbnail_prompt,
-    build_tts_script_ko,
     serialize_scene_plan,
 )
 from app.services.scene_planner import ScenePlannerService
@@ -47,6 +44,7 @@ class PipelineService:
         self.store = JobStore()
         self.provider = VertexProvider()
         self.scene_planner = ScenePlannerService()
+        self.creator_reference = CreatorReferenceService()
         self.executor = ThreadPoolExecutor(max_workers=self.settings.max_worker_jobs)
         self._ocr_warning = ""
         try:
@@ -133,14 +131,11 @@ class PipelineService:
         result_path = out_dir / "result.json"
         strategy_packet_path = out_dir / "strategy_packet.json"
         production_notes_path = out_dir / "production_notes.md"
-        voice_path = out_dir / "voiceover.wav"
-        bgm_wav = out_dir / "bgm.wav"
-        bgm_mp3 = out_dir / "bgm.mp3"
         scene_plan_path = out_dir / "scene_plan.json"
         character_anchor_path = out_dir / "character_anchor.png"
+        creator_reference_path = out_dir / "creator_reference.json"
 
         options = payload.options
-        summary_text = build_tts_script_ko(payload, max_chars=800)
 
         fallback_reason = None
         quality_scores: dict[str, float] = {}
@@ -159,6 +154,7 @@ class PipelineService:
         storyboard_scene_plan: list[dict[str, str | list[str]]] = []
         scene_sources: list[str] = []
         character_bible: dict[str, str | list[str]] = {}
+        creator_reference: dict[str, Any] = {}
         partial_result = False
         text_guard_summary: dict[str, int | list[str] | bool | str] = {
             "thumbnail_retries": 0,
@@ -171,7 +167,14 @@ class PipelineService:
 
         try:
             self.store.update(job_id, status="running", stage="planning", progress=5, pipeline_mode=mode)
-            scene_plan = self.scene_planner.plan(payload)
+            try:
+                creator_reference = self.creator_reference.resolve(payload)
+                atomic_write_json(creator_reference_path, creator_reference)
+            except Exception as exc:
+                creator_reference = {"search_used": False, "error": str(exc)}
+            provider_trace["creator_search_called"] = True
+
+            scene_plan = self.scene_planner.plan(payload, creator_reference=creator_reference)
             provider_trace["scene_planner_called"] = True
             character_bible = {
                 str(k): v if isinstance(v, list) else str(v)
@@ -240,14 +243,8 @@ class PipelineService:
                 )
                 frame_paths.append(frame_path)
 
-            self.provider.generate_tts_wav(summary_text, voice_path)
-            provider_trace["tts_called"] = True
-            self._make_bgm_wav(bgm_wav, duration_sec=options.max_video_seconds)
-            self._wav_to_mp3(bgm_wav, bgm_mp3)
             self._compose_slideshow_video(
                 frame_paths=frame_paths,
-                voice_path=voice_path,
-                bgm_path=bgm_wav,
                 output_path=preview_path,
                 duration_sec=options.max_video_seconds,
             )
@@ -294,6 +291,7 @@ class PipelineService:
                     "production_notes_path": f"/generated/{job_id}/production_notes.md",
                     "scene_plan_path": f"/generated/{job_id}/scene_plan.json",
                     "character_anchor_path": f"/generated/{job_id}/character_anchor.png",
+                    "creator_reference_path": f"/generated/{job_id}/creator_reference.json",
                 },
                 "attempts": attempts,
                 "fallback_reason": fallback_reason,
@@ -307,6 +305,7 @@ class PipelineService:
                 "image_model": self.settings.gcp_vertex_image_model,
                 "scene_planner_model": self.settings.scene_planner_model,
                 "character_bible": character_bible,
+                "creator_reference": creator_reference,
                 "scene_plan_path": f"/generated/{job_id}/scene_plan.json",
                 "character_anchor_path": f"/generated/{job_id}/character_anchor.png",
                 "text_guard_enabled": True,
@@ -341,6 +340,7 @@ class PipelineService:
                     "production_notes_path": f"/generated/{job_id}/production_notes.md",
                     "scene_plan_path": f"/generated/{job_id}/scene_plan.json",
                     "character_anchor_path": f"/generated/{job_id}/character_anchor.png",
+                    "creator_reference_path": f"/generated/{job_id}/creator_reference.json",
                 },
                 "attempts": attempts,
                 "fallback_reason": fallback_reason,
@@ -354,6 +354,7 @@ class PipelineService:
                 "image_model": self.settings.gcp_vertex_image_model,
                 "scene_planner_model": self.settings.scene_planner_model,
                 "character_bible": character_bible,
+                "creator_reference": creator_reference,
                 "scene_plan_path": f"/generated/{job_id}/scene_plan.json",
                 "character_anchor_path": f"/generated/{job_id}/character_anchor.png",
                 "text_guard_enabled": True,
@@ -397,6 +398,7 @@ class PipelineService:
                 time.sleep(self.settings.image_request_interval_sec)
                 if not output_path.exists() or output_path.stat().st_size < 1024:
                     raise ValueError("Generated image is missing or too small.")
+                self._resize_generated_image(output_path)
                 if self._ocr_available:
                     detected_chars = self._detect_text_chars(output_path)
                     if detected_chars > max_allowed_chars:
@@ -448,49 +450,34 @@ class PipelineService:
         capped = min(self.settings.image_retry_backoff_max_sec, base * (2**retry_idx))
         return max(0.1, float(capped))
 
-    @staticmethod
-    def _make_bgm_wav(output_path: Path, duration_sec: int = 5, frequency: float = 220.0) -> None:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        framerate = 44100
-        amplitude = 8000
-        nframes = int(duration_sec * framerate)
-        with wave.open(str(output_path), "w") as wav_file:
-            wav_file.setparams((1, 2, framerate, nframes, "NONE", "not compressed"))
-            for i in range(nframes):
-                value = int(amplitude * math.sin(2 * math.pi * frequency * (i / framerate)))
-                wav_file.writeframes(struct.pack("<h", value))
-
-    @staticmethod
-    def _wav_to_mp3(wav_path: Path, mp3_path: Path) -> None:
-        import subprocess
-
-        from imageio_ffmpeg import get_ffmpeg_exe
-
-        ffmpeg = get_ffmpeg_exe()
-        cmd = [ffmpeg, "-y", "-i", str(wav_path), "-codec:a", "libmp3lame", "-q:a", "5", str(mp3_path)]
-        subprocess.run(cmd, check=True, capture_output=True)
-
-    @staticmethod
     def _compose_slideshow_video(
+        self,
         frame_paths: list[Path],
-        voice_path: Path,
-        bgm_path: Path,
         output_path: Path,
         duration_sec: int,
     ) -> None:
         clip_duration = duration_sec / max(1, len(frame_paths))
         clips = [ImageClip(str(frame)).with_duration(clip_duration) for frame in frame_paths]
         video = concatenate_videoclips(clips, method="compose")
+        video = video.resized(new_size=(self.settings.output_image_width, self.settings.output_image_height))
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            voice = AudioFileClip(str(voice_path)).with_duration(duration_sec).with_volume_scaled(1.0)
-            bgm = AudioFileClip(str(bgm_path)).with_duration(duration_sec).with_volume_scaled(0.2)
-            mixed = CompositeAudioClip([voice, bgm])
-            final = video.with_audio(mixed)
-            final.write_videofile(str(output_path), fps=24, codec="libx264", audio_codec="aac", logger=None)
-            final.close()
-            voice.close()
-            bgm.close()
-        except Exception:
-            video.write_videofile(str(output_path), fps=24, codec="libx264", audio=False, logger=None)
+        # Requested behavior: no voice/music generation, export silent storyboard preview.
+        video.write_videofile(
+            str(output_path),
+            fps=self.settings.preview_video_fps,
+            codec="libx264",
+            audio=False,
+            bitrate=self.settings.preview_video_bitrate,
+            logger=None,
+        )
         video.close()
+
+    def _resize_generated_image(self, image_path: Path) -> None:
+        from PIL import Image
+
+        with Image.open(image_path) as image:
+            resized = image.convert("RGB").resize(
+                (self.settings.output_image_width, self.settings.output_image_height),
+                Image.Resampling.LANCZOS,
+            )
+            resized.save(image_path, format="PNG", optimize=True)

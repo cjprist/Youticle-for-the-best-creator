@@ -128,6 +128,7 @@ class JobResultResponse(BaseModel):
     image_model: str = ""
     scene_planner_model: str = ""
     character_bible: dict[str, str | list[str]] = {}
+    creator_reference: dict[str, object] = {}
     scene_plan_path: str = ""
     character_anchor_path: str = ""
     text_guard_enabled: bool = False
