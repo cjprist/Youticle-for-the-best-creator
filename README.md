@@ -55,6 +55,10 @@ docker compose up --build
 - `GET /health`
 - `POST /api/v1/strategy/plan`
 - `POST /api/v1/strategy/next-video-script`
+- `POST /api/v1/strategy/signals/from-comments`
+- `POST /api/v1/strategy/scripts/from-signal`
+- `POST /api/v1/strategy/pipeline/from-handle`
+- `POST /api/v1/strategy/youtube/comments`
 
 ### Generation backend (`http://localhost:8001`)
 - `GET /health`
