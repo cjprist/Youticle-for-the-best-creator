@@ -1,0 +1,76 @@
+version: "3.9"
+
+name: youticle
+
+services:
+  backend-strategy:
+    build:
+      context: ./backend-strategy
+      dockerfile: Dockerfile
+    container_name: youticle-backend-strategy
+    env_file:
+      - .env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/strategy-sa.json
+      GCP_PROJECT_ID: ${STRATEGY_GCP_PROJECT_ID}
+      GCP_LOCATION: ${STRATEGY_GCP_LOCATION}
+      STRATEGY_VERTEX_API_KEY: ${STRATEGY_VERTEX_API_KEY}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend-strategy:/app
+      - ./.secrets/strategy-sa.json:/secrets/strategy-sa.json:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    networks:
+      - youticle-net
+
+  backend-generation:
+    build:
+      context: ./backend-generation
+      dockerfile: Dockerfile
+    container_name: youticle-backend-generation
+    env_file:
+      - .env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/generation-sa.json
+      GCP_PROJECT_ID: ${GENERATION_GCP_PROJECT_ID}
+      GCP_LOCATION: ${GENERATION_GCP_LOCATION}
+      GENERATION_VERTEX_API_KEY: ${GENERATION_VERTEX_API_KEY}
+      GENERATION_GEMINI_API_KEY: ${GENERATION_GEMINI_API_KEY}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend-generation:/app
+      - ./.secrets/generation-sa.json:/secrets/generation-sa.json:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    restart: unless-stopped
+    depends_on:
+      - backend-strategy
+    networks:
+      - youticle-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: youticle-frontend
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npm install && npm run dev"
+    restart: unless-stopped
+    depends_on:
+      - backend-strategy
+      - backend-generation
+    networks:
+      - youticle-net
+
+networks:
+  youticle-net:
+    driver: bridge

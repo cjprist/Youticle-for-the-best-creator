@@ -1,0 +1,30 @@
+services:
+  worker-render:
+    build:
+      context: ./worker-render
+      dockerfile: Dockerfile
+    container_name: youticle-worker-render
+    env_file:
+      - .env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp-sa.json
+    volumes:
+      - ./.secrets/gcp-sa.json:/secrets/gcp-sa.json:ro
+    restart: unless-stopped
+    networks:
+      - youticle-net
+
+  worker-analytics:
+    build:
+      context: ./worker-analytics
+      dockerfile: Dockerfile
+    container_name: youticle-worker-analytics
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - youticle-net
+
+networks:
+  youticle-net:
+    driver: bridge
