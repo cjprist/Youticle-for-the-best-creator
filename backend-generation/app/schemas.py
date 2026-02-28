@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class JobOptions(BaseModel):
     max_video_seconds: int = Field(default=5, ge=3, le=5)
-    fallback_mode: Literal["image_voice_music"] = "image_voice_music"
+    fallback_mode: Literal["storyboard"] = "storyboard"
     quality_mode: Literal["balanced", "high"] = "balanced"
 
 
@@ -16,6 +16,9 @@ class MetaData(BaseModel):
     target_length_sec: int = Field(default=180, ge=30, le=600)
     language: str = "ko"
     style: str = "informative"
+    title: str = ""
+    description: str = ""
+    target_audience: str = ""
 
 
 class EvidenceItem(BaseModel):
@@ -84,7 +87,7 @@ class AssetJobCreateResponse(BaseModel):
     status: str
     status_path: str
     result_path: str
-    pipeline_mode: Literal["video", "image_voice_music"]
+    pipeline_mode: Literal["storyboard", "storyboard_to_video"]
 
 
 class AssetJobStatusResponse(BaseModel):
@@ -92,8 +95,8 @@ class AssetJobStatusResponse(BaseModel):
     status: Literal["queued", "running", "succeeded", "failed"]
     stage: str
     progress: int
-    pipeline_mode: Literal["video", "image_voice_music", "unknown"] = "unknown"
-    output_mode: Literal["video", "image_voice_music", "unknown"] = "unknown"
+    pipeline_mode: Literal["storyboard", "storyboard_to_video", "unknown"] = "unknown"
+    output_mode: Literal["storyboard", "storyboard_to_video", "unknown"] = "unknown"
     video_path: str | None = None
     alt_video_path: str | None = None
     result_path: str
@@ -115,4 +118,20 @@ class JobResultResponse(BaseModel):
     quality_scores: dict[str, float]
     files: dict[str, str]
     fallback_reason: str | None = None
-    provider_trace: dict[str, int | bool | str] = {}
+    provider_trace: dict[str, int | bool | str | list[str]] = {}
+    prompt_version: str = ""
+    frame_count: int = 0
+    style_bible_applied: bool = False
+    script_grounding_applied: bool = False
+    scene_sources: list[str] = []
+    storyboard_scene_plan: list[dict[str, str | list[str]]] = []
+    image_model: str = ""
+    scene_planner_model: str = ""
+    character_bible: dict[str, str | list[str]] = {}
+    scene_plan_path: str = ""
+    character_anchor_path: str = ""
+    text_guard_enabled: bool = False
+    text_guard_summary: dict[str, int | bool | str | list[str]] = {}
+    veo_trace: dict[str, str | int | bool] = {}
+    partial_result: bool = False
+    error_message: str | None = None

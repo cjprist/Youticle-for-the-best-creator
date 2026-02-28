@@ -11,12 +11,21 @@ class Settings(BaseSettings):
     gen_app_debug: bool = True
 
     gcp_project_id: str = ""
-    gcp_location: str = "us-central1"
+    gcp_location: str = "global"
     generated_dir: str = "/workspace/frontend/public/generated"
-    gcp_vertex_image_model: str = "imagen-4.0-generate-001"
+    gcp_vertex_image_model: str = "gemini-3-pro-image-preview"
     gcp_vertex_video_model: str = "veo-3.1-generate-preview"
     gcp_vertex_audio_model: str = "gemini-2.5-flash-preview-tts"
-    max_worker_jobs: int = 2
+    scene_planner_model: str = "gemini-2.5-pro"
+    max_scene_plan_attempts: int = 2
+    max_image_text_retry: int = 2
+    max_allowed_text_chars_frame: int = 0
+    max_allowed_text_chars_thumbnail: int = 2
+    max_image_generation_attempts: int = 8
+    image_retry_backoff_base_sec: float = 2.0
+    image_retry_backoff_max_sec: float = 20.0
+    image_request_interval_sec: float = 1.0
+    max_worker_jobs: int = 1
     default_max_video_seconds: int = 5
     video_quality_threshold: float = 0.55
     max_video_attempts: int = 2

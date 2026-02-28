@@ -5,3 +5,4 @@ google-genai==1.40.0
 pillow==10.4.0
 moviepy==2.1.2
 imageio-ffmpeg==0.6.0
+pytesseract==0.3.13

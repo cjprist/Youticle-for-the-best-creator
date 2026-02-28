@@ -11,8 +11,8 @@ class JobRecord:
     status: Literal["queued", "running", "succeeded", "failed"] = "queued"
     stage: str = "queued"
     progress: int = 0
-    pipeline_mode: Literal["video", "image_voice_music", "unknown"] = "unknown"
-    output_mode: Literal["video", "image_voice_music", "unknown"] = "unknown"
+    pipeline_mode: Literal["storyboard", "storyboard_to_video", "unknown"] = "unknown"
+    output_mode: Literal["storyboard", "storyboard_to_video", "unknown"] = "unknown"
     video_path: str | None = None
     alt_video_path: str | None = None
     result_path: str = ""

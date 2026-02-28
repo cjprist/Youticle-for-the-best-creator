@@ -65,7 +65,7 @@
   },
   "options": {
     "max_video_seconds": 5,
-    "fallback_mode": "image_voice_music",
+    "fallback_mode": "storyboard",
     "quality_mode": "balanced"
   }
 }

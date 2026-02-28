@@ -21,32 +21,67 @@ class VertexProvider:
             location=settings.gcp_location,
         )
 
-    def generate_image(self, prompt: str, output_path: Path) -> Path:
-        response = self.client.models.generate_images(
+    def generate_image(
+        self,
+        prompt: str,
+        output_path: Path,
+        reference_images: list[Path] | None = None,
+    ) -> Path:
+        contents: list[object] = [prompt]
+        for reference in reference_images or []:
+            if not reference.exists():
+                continue
+            contents.append(
+                types.Part.from_bytes(data=reference.read_bytes(), mime_type="image/png")
+            )
+
+        response = self.client.models.generate_content(
             model=self.settings.gcp_vertex_image_model,
-            prompt=prompt,
-            config=types.GenerateImagesConfig(number_of_images=1),
+            contents=contents,
+            config=types.GenerateContentConfig(response_modalities=[types.Modality.IMAGE]),
         )
-        if not getattr(response, "generated_images", None):
-            raise ValueError("Vertex image generation returned no images.")
-        image = response.generated_images[0]
-        image_data = getattr(image, "image", None)
-        if not image_data or not getattr(image_data, "image_bytes", None):
-            raise ValueError("Vertex image payload empty.")
+        image_bytes = None
+        for candidate in response.candidates or []:
+            if not candidate.content:
+                continue
+            for part in candidate.content.parts or []:
+                inline_data = getattr(part, "inline_data", None)
+                if inline_data and inline_data.data:
+                    image_bytes = inline_data.data
+                    break
+            if image_bytes:
+                break
+
+        if not image_bytes:
+            raise ValueError("Gemini image payload missing.")
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_bytes(image_data.image_bytes)
+        output_path.write_bytes(image_bytes)
         return output_path
 
-    def generate_video(self, prompt: str, output_path: Path, duration_sec: int) -> Path:
-        operation = self.client.models.generate_videos(
-            model=self.settings.gcp_vertex_video_model,
-            prompt=prompt,
-            config=types.GenerateVideosConfig(
+    def generate_video(
+        self,
+        prompt: str,
+        output_path: Path,
+        duration_sec: int,
+        image_path: Path | None = None,
+    ) -> Path:
+        kwargs: dict[str, object] = {
+            "model": self.settings.gcp_vertex_video_model,
+            "prompt": prompt,
+            "config": types.GenerateVideosConfig(
                 duration_seconds=duration_sec,
                 aspect_ratio="16:9",
                 resolution="720p",
             ),
-        )
+        }
+        if image_path and image_path.exists():
+            try:
+                kwargs["image"] = types.Image.from_file(location=str(image_path), mime_type="image/png")
+            except TypeError:
+                kwargs["image"] = types.Image.from_file(str(image_path))
+
+        operation = self.client.models.generate_videos(**kwargs)
         max_polls = 45
         for _ in range(max_polls):
             operation = self.client.operations.get(operation=operation)
