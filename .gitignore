@@ -13,3 +13,5 @@ node_modules/
 out/
 .secrets/*.json
 .venv/
+frontend/public/generated/*
+!frontend/public/generated/.gitkeep

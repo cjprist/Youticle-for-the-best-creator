@@ -38,11 +38,13 @@ services:
       GCP_LOCATION: ${GENERATION_GCP_LOCATION}
       GENERATION_VERTEX_API_KEY: ${GENERATION_VERTEX_API_KEY}
       GENERATION_GEMINI_API_KEY: ${GENERATION_GEMINI_API_KEY}
+      GENERATED_DIR: /workspace/frontend/public/generated
     ports:
       - "8001:8001"
     volumes:
       - ./backend-generation:/app
       - ./.secrets/generation-sa.json:/secrets/generation-sa.json:ro
+      - ./frontend/public/generated:/workspace/frontend/public/generated
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
     restart: unless-stopped
     depends_on:

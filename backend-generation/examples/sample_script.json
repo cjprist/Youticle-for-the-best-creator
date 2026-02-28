@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "source_signal_id": "S2",
+    "target_length_sec": 180,
+    "language": "ko",
+    "style": "informative"
+  },
+  "rationale_block": {
+    "title": "왜 이 대본이 만들어졌나요?",
+    "evidence_summary": [
+      {
+        "quote": "프랑스는 베를린을 위해 파리를 포기할 수 있는가?",
+        "like_count": 470,
+        "video_id": "wPKfa2qWh4U"
+      }
+    ],
+    "logic": {
+      "observations": ["핵우산 신뢰 테스트 질문이 많음", "제재/비용 계산이 등장"],
+      "inference": ["확장억제는 결국 지불 의지 문제로 인식됨"],
+      "conclusion": "핵무장 논의의 핵심은 신뢰·제재·대안 3변수다."
+    },
+    "what_we_excluded": [
+      {
+        "example": "☢️",
+        "reason": "meme/low_info"
+      }
+    ]
+  },
+  "script": {
+    "title": "핵우산이 왜 보험처럼 안 느껴질까?",
+    "hook_0_15s": "오늘은 핵우산 논쟁을 감정이 아닌 조건표로 정리합니다.",
+    "body_15_150s": [
+      {
+        "t": "0:15-0:45",
+        "line": "첫 번째 질문은 동맹의 지불 의지입니다."
+      },
+      {
+        "t": "0:45-1:20",
+        "line": "두 번째 질문은 제재를 감내할 수 있는지입니다."
+      },
+      {
+        "t": "1:20-2:05",
+        "line": "세 번째 질문은 대안 억제 옵션의 존재입니다."
+      }
+    ],
+    "closing_150_180s": "신뢰·제재·대안 중 가장 중요한 변수를 댓글로 남겨주세요.",
+    "cta": {
+      "type": "comment_prompt",
+      "line": "1(신뢰) / 2(제재) / 3(대안)"
+    }
+  },
+  "assets": {
+    "on_screen_bullets": [
+      "핵우산 = 지불 의지 문제",
+      "조건표: 신뢰·제재·대안",
+      "강함 + 위기관리 동시 필요"
+    ],
+    "simple_chart_or_table": [
+      {
+        "label": "질문 1",
+        "value": "동맹이 끝까지 눌러줄까?"
+      }
+    ],
+    "disclaimer": "본 콘텐츠는 정보 제공 목적입니다."
+  },
+  "options": {
+    "max_video_seconds": 5,
+    "fallback_mode": "image_voice_music",
+    "quality_mode": "balanced"
+  }
+}
