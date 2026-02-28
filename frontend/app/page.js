@@ -8,13 +8,6 @@ const strategyApi =
   process.env.NEXT_PUBLIC_STRATEGY_API_URL || "http://localhost:8000";
 const generationApi =
   process.env.NEXT_PUBLIC_GENERATION_API_URL || "http://localhost:8001";
-const demoFramePaths = [
-  "/generated/kakaotalk%20photo%2001.png",
-  "/generated/kakaotalk%20photo%2002.png",
-  "/generated/kakaotalk%20photo%2003.png",
-  "/generated/kakaotalk%20photo%2004.png",
-  "/generated/kakaotalk%20photo%2005.png",
-];
 
 async function fetchYouTubeComments(channelHandle, maxVideos) {
   const response = await fetch(
@@ -213,6 +206,14 @@ function buildAssetJobPayload(scriptOutput, selectedSignal) {
       quality_mode: "balanced",
     },
   };
+}
+
+function buildDefaultFramePaths(jobId) {
+  if (!jobId) return [];
+  return [1, 2, 3, 4, 5].map(
+    (index) =>
+      `/generated/${jobId}/frames/frame_${String(index).padStart(2, "0")}.png`,
+  );
 }
 
 function normalizeText(text) {
@@ -462,18 +463,32 @@ export default function Home() {
     setIsGeneratingAssets(true);
     setErrorMessage("");
     try {
+      const payload = buildAssetJobPayload(
+        result.script_output,
+        result.selected_signal,
+      );
+      const created = await createStoryboardJob(payload);
+      const completed = await waitForAssetJob(created.job_id);
+      const rawResult = completed.result || {};
+      const existingFramePaths = Array.isArray(rawResult?.files?.frame_paths)
+        ? rawResult.files.frame_paths
+        : [];
+      const mergedResult = {
+        ...rawResult,
+        files: {
+          ...(rawResult.files || {}),
+          frame_paths:
+            existingFramePaths.length > 0
+              ? existingFramePaths
+              : buildDefaultFramePaths(created.job_id),
+        },
+      };
+
       setResult((prev) => ({
         ...prev,
-        asset_job: { job_id: "demo-mrbease-frames" },
-        asset_status: { status: "succeeded" },
-        asset_result: {
-          job_id: "demo-mrbease-frames",
-          status: "succeeded",
-          files: {
-            thumbnail_path: demoFramePaths[0],
-            frame_paths: demoFramePaths,
-          },
-        },
+        asset_job: created,
+        asset_status: completed.status,
+        asset_result: mergedResult,
       }));
     } catch (error) {
       setErrorMessage(error.message);
@@ -834,7 +849,7 @@ export default function Home() {
               ) : null}
               {result.asset_result ? (
                 <section className="result-panel">
-                  <h3>🖼️ 생성된 썸네일</h3>
+                  <h3>🖼️ 생성된 영상 프레임</h3>
                   <p>
                     <strong>job_id:</strong> {result.asset_result.job_id}
                   </p>
@@ -854,14 +869,16 @@ export default function Home() {
                   {Array.isArray(result.asset_result?.files?.frame_paths) &&
                   result.asset_result.files.frame_paths.length > 0 ? (
                     <div className="generated-frames">
-                      {result.asset_result.files.frame_paths.map((framePath) => (
-                        <img
-                          key={framePath}
-                          src={framePath}
-                          alt={`generated frame ${framePath}`}
-                          className="generated-frame"
-                        />
-                      ))}
+                      {result.asset_result.files.frame_paths.map(
+                        (framePath) => (
+                          <img
+                            key={framePath}
+                            src={framePath}
+                            alt={`generated frame ${framePath}`}
+                            className="generated-frame"
+                          />
+                        ),
+                      )}
                     </div>
                   ) : null}
                   <details>
