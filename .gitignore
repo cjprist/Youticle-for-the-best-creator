@@ -1,4 +1,7 @@
+# Env files
 .env
+.env.*
+!.env.example
 __pycache__/
 .pytest_cache/
 .mypy_cache/
@@ -9,6 +12,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 node_modules/
+.npm-cache/
 .next/
 out/
 .secrets/*.json

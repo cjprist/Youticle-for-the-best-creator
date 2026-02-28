@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     gcp_project_id: str = ""
     gcp_location: str = "us-central1"
     strategy_vertex_text_model: str = "gemini-2.5-flash"
+    youtube_data_api_key: str = ""
+    youtube_api_base_url: str = "https://www.googleapis.com/youtube/v3"
 
 
 @lru_cache
